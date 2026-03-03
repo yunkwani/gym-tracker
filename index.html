@@ -121,6 +121,31 @@
             </div>
         </section>
 
+        <!-- ========== VISTA: PROGRESO ========== -->
+        <section id="view-progress" class="view">
+            <div class="progress-header">
+                <div class="form-group" style="margin-bottom:14px;">
+                    <label for="progress-exercise-select">Seleccionar ejercicio</label>
+                    <select id="progress-exercise-select" onchange="app.renderProgressChart()">
+                        <option value="">-- Elige un ejercicio --</option>
+                    </select>
+                </div>
+                <div class="progress-metric-toggle">
+                    <button class="btn btn-sm metric-btn active" data-metric="weight"
+                        onclick="app.setProgressMetric('weight')">Peso máx.</button>
+                    <button class="btn btn-sm metric-btn" data-metric="volume"
+                        onclick="app.setProgressMetric('volume')">Volumen</button>
+                </div>
+            </div>
+            <div class="chart-container glass-card">
+                <canvas id="progress-canvas" width="560" height="300"></canvas>
+                <div id="chart-empty" class="chart-empty">Selecciona un ejercicio para ver tu progreso</div>
+            </div>
+            <div id="progress-stats" class="progress-stats hidden">
+                <!-- Populated by JS -->
+            </div>
+        </section>
+
         <!-- ========== VISTA: HISTORIAL ========== -->
         <section id="view-history" class="view">
             <div id="history-list" class="card-list">
@@ -135,6 +160,13 @@
         <!-- ========== VISTA: DETALLE HISTORIAL ========== -->
         <section id="view-history-detail" class="view">
             <div id="history-detail-content" class="history-detail">
+                <!-- Populated by JS -->
+            </div>
+        </section>
+
+        <!-- ========== VISTA: EDITAR HISTORIAL ========== -->
+        <section id="view-edit-history" class="view">
+            <div id="edit-history-content" class="history-detail">
                 <!-- Populated by JS -->
             </div>
         </section>
@@ -190,7 +222,7 @@
     <!-- Bottom Navigation -->
     <nav id="bottom-nav">
         <button class="nav-item active" data-view="routines" onclick="app.navigate('routines')">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="3" width="7" height="7" rx="1" />
                 <rect x="14" y="3" width="7" height="7" rx="1" />
                 <rect x="3" y="14" width="7" height="7" rx="1" />
@@ -199,14 +231,20 @@
             <span>Rutinas</span>
         </button>
         <button class="nav-item" data-view="train" onclick="app.navigate('train')">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path
                     d="M6.5 6.5h11M6.5 17.5h11M4 10h1.5M4 14h1.5M18.5 10H20M18.5 14H20M6.5 6.5v11M17.5 6.5v11M6.5 10h11M6.5 14h11" />
             </svg>
             <span>Entrenar</span>
         </button>
+        <button class="nav-item" data-view="progress" onclick="app.navigate('progress')">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+            </svg>
+            <span>Progreso</span>
+        </button>
         <button class="nav-item" data-view="history" onclick="app.navigate('history')">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10" />
                 <polyline points="12 6 12 12 16 14" />
             </svg>

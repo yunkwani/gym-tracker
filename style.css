@@ -1127,3 +1127,152 @@ input::placeholder {
 .toast.show {
     transform: translateX(-50%) translateY(0);
 }
+
+/* --- Progress View --- */
+select {
+    width: 100%;
+    padding: 14px 16px;
+    background: var(--bg-input);
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-family: var(--font);
+    font-size: 0.95rem;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239595b0' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    cursor: pointer;
+}
+
+select:focus {
+    border-color: var(--accent-1);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+select option {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.progress-metric-toggle {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.metric-btn {
+    flex: 1;
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+}
+
+.metric-btn.active {
+    background: rgba(99, 102, 241, 0.15);
+    color: var(--accent-1);
+    border-color: var(--accent-1);
+}
+
+.chart-container {
+    position: relative;
+    padding: 16px;
+    margin-bottom: 16px;
+    overflow: hidden;
+}
+
+.chart-container canvas {
+    width: 100%;
+    height: 220px;
+    display: block;
+}
+
+.chart-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    text-align: center;
+    padding: 20px;
+}
+
+.chart-empty.hidden {
+    display: none;
+}
+
+.progress-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.progress-stats.hidden {
+    display: none;
+}
+
+.stat-card {
+    padding: 16px;
+    text-align: center;
+}
+
+.stat-card .stat-value {
+    font-size: 1.4rem;
+    font-weight: 800;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 4px;
+}
+
+.stat-card .stat-label {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+}
+
+/* --- History Detail Actions --- */
+.detail-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.detail-actions .btn {
+    flex: 1;
+}
+
+/* --- Edit History --- */
+.edit-set-row {
+    display: grid;
+    grid-template-columns: 40px 1fr 1fr;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.edit-set-row .set-number {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--bg-input);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+}
+
+.edit-set-row input[type="number"] {
+    padding: 10px 8px;
+    font-size: 0.88rem;
+    text-align: center;
+}

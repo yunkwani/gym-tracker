@@ -79,6 +79,9 @@ class GymTrackerApp {
         this.restTimerInterval = null;
         this.restTimerRunning = false;
 
+        // Progress state
+        this.currentProgressMetric = 'weight'; // 'weight' or 'volume'
+
         // Confirm callback
         this._confirmCallback = null;
 
@@ -90,6 +93,7 @@ class GymTrackerApp {
         this.renderRoutines();
         this.renderTrainSelect();
         this.renderHistory();
+        this.renderProgressSelect();
         this.updateEmptyStates();
 
         // Register service worker
@@ -126,7 +130,7 @@ class GymTrackerApp {
         this.currentView = viewName;
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
 
-        const mainViews = { routines: 'view-routines', train: 'view-train', history: 'view-history' };
+        const mainViews = { routines: 'view-routines', train: 'view-train', progress: 'view-progress', history: 'view-history' };
         const targetEl = document.getElementById(mainViews[viewName]);
         if (targetEl) {
             targetEl.classList.add('active');
@@ -138,7 +142,7 @@ class GymTrackerApp {
         });
 
         // Update header
-        const titles = { routines: 'Mis Rutinas', train: 'Entrenar', history: 'Historial' };
+        const titles = { routines: 'Mis Rutinas', train: 'Entrenar', progress: 'Progreso', history: 'Historial' };
         document.getElementById('header-title').textContent = titles[viewName] || 'GymTracker';
 
         // Update header action button
@@ -154,6 +158,7 @@ class GymTrackerApp {
         if (viewName === 'train') this.renderTrainSelect();
         if (viewName === 'history') this.renderHistory();
         if (viewName === 'routines') this.renderRoutines();
+        if (viewName === 'progress') this.renderProgressChart();
 
         this.updateEmptyStates();
     }
@@ -614,11 +619,120 @@ class GymTrackerApp {
             `;
         });
 
-        html += `<button class="btn btn-ghost detail-back-btn" onclick="app.navigate('history')">← Volver al historial</button>`;
+        html += `
+            <div class="detail-actions">
+                <button class="btn btn-outline" onclick="app.showEditHistory('${workout.id}')">✏️ Editar</button>
+                <button class="btn btn-ghost" onclick="app.deleteHistory('${workout.id}')" style="color: var(--danger);">🗑️ Eliminar</button>
+            </div>
+            <button class="btn btn-ghost detail-back-btn" onclick="app.navigate('history')">← Volver al historial</button>
+        `;
 
         document.getElementById('history-detail-content').innerHTML = html;
         this.showView('view-history-detail');
         document.getElementById('header-title').textContent = 'Detalle';
+    }
+
+    // ——— History Edit & Delete ———
+    deleteHistory(id) {
+        this.showConfirm('¿Eliminar este entrenamiento del historial?', () => {
+            this.history = this.history.filter(w => w.id !== id);
+            this.save('gymtracker_history', this.history);
+            this.renderHistory();
+            this.updateEmptyStates();
+            this.showToast('Entrenamiento eliminado');
+            this.navigate('history');
+        });
+    }
+
+    showEditHistory(id) {
+        const workout = this.history.find(w => w.id === id);
+        if (!workout) return;
+
+        // Create a deep copy for editing
+        this.editingHistoryWorkout = JSON.parse(JSON.stringify(workout));
+
+        this.renderEditHistory();
+        this.showView('view-edit-history');
+        document.getElementById('header-title').textContent = 'Editar Historial';
+    }
+
+    renderEditHistory() {
+        if (!this.editingHistoryWorkout) return;
+        const w = this.editingHistoryWorkout;
+
+        let html = `<div class="glass-card" style="margin-bottom: 20px; padding: 16px;">
+            <h3 style="margin-bottom: 8px;">${this.esc(w.routineName)}</h3>
+            <p style="color: var(--text-secondary); font-size: 0.85rem;">Puedes modificar el peso y las repeticiones de las series.</p>
+        </div>`;
+
+        w.exercises.forEach((ex, exIdx) => {
+            const cat = EXERCISE_CATALOG.find(c => c.id === ex.exerciseId);
+            const name = cat ? cat.name : ex.exerciseId;
+
+            let setsHtml = ex.sets.map((set, setIdx) => `
+                <div class="edit-set-row">
+                    <div class="set-number">${setIdx + 1}</div>
+                    <input type="number" placeholder="kg" value="${set.weight}" min="0" step="0.5"
+                        onchange="app.updateEditHistorySet(${exIdx}, ${setIdx}, 'weight', this.value)"
+                        onfocus="this.select()">
+                    <input type="number" placeholder="reps" value="${set.reps}" min="0"
+                        onchange="app.updateEditHistorySet(${exIdx}, ${setIdx}, 'reps', this.value)"
+                        onfocus="this.select()">
+                </div>
+            `).join('');
+
+            html += `
+                <div class="glass-card detail-exercise">
+                    <h3 style="margin-bottom: 12px; font-size: 1rem;">${this.esc(name)}</h3>
+                    <div style="display: grid; grid-template-columns: 40px 1fr 1fr; gap: 8px; margin-bottom: 8px; font-size: 0.8rem; color: var(--text-secondary); text-align: center;">
+                        <div>Sr.</div><div>Peso (kg)</div><div>Reps</div>
+                    </div>
+                    ${setsHtml}
+                </div>
+            `;
+        });
+
+        html += `
+            <div class="detail-actions" style="margin-top: 24px;">
+                <button class="btn btn-ghost" onclick="app.showHistoryDetail('${w.id}')">Cancelar</button>
+                <button class="btn btn-primary" onclick="app.saveHistoryEdit()">Guardar Cambios</button>
+            </div>
+        `;
+
+        document.getElementById('edit-history-content').innerHTML = html;
+    }
+
+    updateEditHistorySet(exIdx, setIdx, field, value) {
+        if (!this.editingHistoryWorkout) return;
+        this.editingHistoryWorkout.exercises[exIdx].sets[setIdx][field] = value;
+    }
+
+    saveHistoryEdit() {
+        if (!this.editingHistoryWorkout) return;
+
+        const w = this.editingHistoryWorkout;
+        // Recalculate total volume
+        let totalVolume = 0;
+        w.exercises.forEach(ex => {
+            ex.sets.forEach(s => {
+                const weight = parseFloat(s.weight) || 0;
+                const reps = parseInt(s.reps) || 0;
+                totalVolume += weight * reps;
+            });
+        });
+        w.totalVolume = Math.round(totalVolume);
+
+        // Save to state
+        const idx = this.history.findIndex(h => h.id === w.id);
+        if (idx !== -1) {
+            this.history[idx] = w;
+            this.save('gymtracker_history', this.history);
+        }
+
+        this.editingHistoryWorkout = null;
+        this.showToast('Cambios guardados');
+        // Refresh detail view
+        this.showHistoryDetail(w.id);
     }
 
     // ——— Rest Timer ———
@@ -690,6 +804,232 @@ class GymTrackerApp {
         const progress = this.restRemaining / this.restTime;
         const offset = circumference * (1 - progress);
         document.getElementById('timer-progress').setAttribute('stroke-dashoffset', offset);
+    }
+
+    // ——— Progress ———
+    renderProgressSelect() {
+        const select = document.getElementById('progress-exercise-select');
+        // Find all unique exercises from history
+        const usedExIds = new Set();
+        this.history.forEach(w => w.exercises.forEach(ex => usedExIds.add(ex.exerciseId)));
+
+        if (usedExIds.size === 0) return;
+
+        let optionsHtml = '<option value="">-- Elige un ejercicio --</option>';
+        const groups = {};
+
+        usedExIds.forEach(id => {
+            const cat = EXERCISE_CATALOG.find(c => c.id === id);
+            if (cat) {
+                if (!groups[cat.muscle]) groups[cat.muscle] = [];
+                groups[cat.muscle].push(cat);
+            }
+        });
+
+        for (const [muscle, exercises] of Object.entries(groups)) {
+            exercises.sort((a, b) => a.name.localeCompare(b.name));
+            optionsHtml += `<optgroup label="${muscle}">`;
+            exercises.forEach(ex => {
+                optionsHtml += `<option value="${ex.id}">${this.esc(ex.name)}</option>`;
+            });
+            optionsHtml += `</optgroup>`;
+        }
+
+        select.innerHTML = optionsHtml;
+    }
+
+    setProgressMetric(metric) {
+        this.currentProgressMetric = metric;
+        document.querySelectorAll('.metric-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.metric === metric);
+        });
+        this.renderProgressChart();
+    }
+
+    renderProgressChart() {
+        const select = document.getElementById('progress-exercise-select');
+        const exId = select.value;
+        const canvas = document.getElementById('progress-canvas');
+        const emptyState = document.getElementById('chart-empty');
+        const statsRow = document.getElementById('progress-stats');
+
+        if (!exId) {
+            emptyState.classList.remove('hidden');
+            statsRow.classList.add('hidden');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            return;
+        }
+
+        // Collect data points for the selected exercise, chronological order
+        const dataPoints = [];
+
+        // Search history backwards (oldest first)
+        for (let i = this.history.length - 1; i >= 0; i--) {
+            const workout = this.history[i];
+            const exData = workout.exercises.find(e => e.exerciseId === exId);
+
+            if (exData && exData.sets.length > 0) {
+                const date = new Date(workout.date);
+                const dateLabel = date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+
+                let maxWeight = 0;
+                let volume = 0;
+
+                exData.sets.forEach(s => {
+                    const weight = parseFloat(s.weight) || 0;
+                    const reps = parseInt(s.reps) || 0;
+                    if (weight > maxWeight) maxWeight = weight;
+                    volume += weight * reps;
+                });
+
+                dataPoints.push({
+                    dateLabel,
+                    weight: maxWeight,
+                    volume: Math.round(volume),
+                    rawDate: workout.date
+                });
+            }
+        }
+
+        if (dataPoints.length === 0) {
+            emptyState.classList.remove('hidden');
+            statsRow.classList.add('hidden');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            return;
+        }
+
+        emptyState.classList.add('hidden');
+        statsRow.classList.remove('hidden');
+
+        // Render stats
+        const values = dataPoints.map(d => d[this.currentProgressMetric]);
+        let maxVal = Math.max(...values);
+        let currentVal = values[values.length - 1];
+        let diffText = '';
+
+        if (values.length > 1) {
+            const prevVal = values[values.length - 2];
+            const diff = currentVal - prevVal;
+            if (diff > 0) diffText = `<span style="color:var(--success); font-size:0.8rem; margin-left:4px;">▲ +${diff}</span>`;
+            else if (diff < 0) diffText = `<span style="color:var(--danger); font-size:0.8rem; margin-left:4px;">▼ ${diff}</span>`;
+        }
+
+        const unit = this.currentProgressMetric === 'weight' ? 'kg' : 'kg (vol)';
+        document.getElementById('progress-stats').innerHTML = `
+            <div class="glass-card stat-card">
+                <div class="stat-value">${currentVal}<span style="font-size:0.8rem;color:var(--text-secondary);">${unit}</span></div>
+                <div class="stat-label">Último ${diffText}</div>
+            </div>
+            <div class="glass-card stat-card">
+                <div class="stat-value">${maxVal}<span style="font-size:0.8rem;color:var(--text-secondary);">${unit}</span></div>
+                <div class="stat-label">Récord All-Time</div>
+            </div>
+        `;
+
+        // Canvas drawing
+        const ctx = canvas.getContext('2d');
+        const W = canvas.width;
+        const H = canvas.height;
+        ctx.clearRect(0, 0, W, H);
+
+        if (dataPoints.length < 2) {
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.font = '14px ' + getComputedStyle(document.body).fontFamily;
+            ctx.textAlign = 'center';
+            ctx.fillText('Registra más datos para ver la gráfica', W / 2, H / 2);
+            return;
+        }
+
+        // Padding
+        const padding = { top: 30, right: 30, bottom: 40, left: 50 };
+        const graphW = W - padding.left - padding.right;
+        const graphH = H - padding.top - padding.bottom;
+
+        // Find min/max for scale
+        const minVal = Math.min(...values) * 0.9; // add 10% bottom margin
+        const range = (maxVal - minVal) || 1;
+
+        // Draw Axes & Grid
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+
+        const gridLines = 4;
+        for (let i = 0; i <= gridLines; i++) {
+            const y = padding.top + (graphH * (i / gridLines));
+            ctx.moveTo(padding.left, y);
+            ctx.lineTo(W - padding.right, y);
+
+            // Y-axis labels
+            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+            ctx.font = '12px ' + getComputedStyle(document.body).fontFamily;
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            const val = maxVal - ((maxVal - minVal) * (i / gridLines));
+            ctx.fillText(Math.round(val), padding.left - 10, y);
+        }
+        ctx.stroke();
+
+        // Calculate point coordinates
+        const points = dataPoints.map((dp, i) => {
+            const x = padding.left + (i * (graphW / (dataPoints.length - 1)));
+            const y = padding.top + graphH - ((dp[this.currentProgressMetric] - minVal) / range) * graphH;
+            return { x, y, label: dp.dateLabel };
+        });
+
+        // Draw Line with Gradient
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) {
+            // Smooth curve
+            const xc = (points[i].x + points[i - 1].x) / 2;
+            const yc = (points[i].y + points[i - 1].y) / 2;
+            ctx.quadraticCurveTo(points[i - 1].x, points[i - 1].y, xc, yc);
+            if (i === points.length - 1) {
+                ctx.quadraticCurveTo(xc, yc, points[i].x, points[i].y);
+            }
+        }
+
+        ctx.strokeStyle = '#818cf8'; // accent-1 length
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+
+        // Fill below line
+        ctx.lineTo(points[points.length - 1].x, padding.top + graphH);
+        ctx.lineTo(points[0].x, padding.top + graphH);
+        ctx.closePath();
+        const gradient = ctx.createLinearGradient(0, padding.top, 0, H - padding.bottom);
+        gradient.addColorStop(0, 'rgba(129, 140, 248, 0.4)');
+        gradient.addColorStop(1, 'rgba(129, 140, 248, 0.0)');
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // Draw Points & X-axis labels Let me fix the labels length logic to avoid crowding
+        const step = Math.ceil(points.length / 6); // Max 6 labels
+
+        points.forEach((p, i) => {
+            // Point
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#1e1e2e'; // bg color
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#c084fc'; // accent-2
+            ctx.stroke();
+
+            // Label
+            if (i % step === 0 || i === points.length - 1) {
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                ctx.font = '11px ' + getComputedStyle(document.body).fontFamily;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                ctx.fillText(p.label, p.x, padding.top + graphH + 10);
+            }
+        });
     }
 
     // ——— Empty States ———
