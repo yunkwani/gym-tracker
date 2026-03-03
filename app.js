@@ -69,8 +69,8 @@ class GymTrackerApp {
         this.tempPickerSelection = [];
 
         // Active workout state
-        this.activeWorkout = null;
-        this.workoutStartTime = null;
+        this.activeWorkout = this.load('gymtracker_active_workout') || null;
+        this.workoutStartTime = this.load('gymtracker_active_time') || null;
         this.workoutTimerInterval = null;
 
         // Rest timer state
@@ -95,6 +95,11 @@ class GymTrackerApp {
         this.renderHistory();
         this.renderProgressSelect();
         this.updateEmptyStates();
+
+        // Resume active workout if exists
+        if (this.activeWorkout && this.workoutStartTime) {
+            this.resumeWorkout();
+        }
 
         // Register service worker
         if ('serviceWorker' in navigator) {
@@ -144,6 +149,12 @@ class GymTrackerApp {
         // Update header
         const titles = { routines: 'Mis Rutinas', train: 'Entrenar', progress: 'Progreso', history: 'Historial' };
         document.getElementById('header-title').textContent = titles[viewName] || 'GymTracker';
+
+        // If restoring active workout directly into train view
+        if (viewName === 'train' && this.activeWorkout) {
+            document.getElementById('train-select').classList.add('hidden');
+            document.getElementById('train-active').classList.remove('hidden');
+        }
 
         // Update header action button
         const actionBtn = document.getElementById('header-action-btn');
@@ -390,6 +401,7 @@ class GymTrackerApp {
             }))
         };
         this.workoutStartTime = Date.now();
+        this.saveActiveWorkoutState();
 
         document.getElementById('train-select').classList.add('hidden');
         document.getElementById('train-active').classList.remove('hidden');
@@ -399,6 +411,38 @@ class GymTrackerApp {
         this.workoutTimerInterval = setInterval(() => this.updateWorkoutTimer(), 1000);
 
         this.renderWorkoutExercises();
+    }
+
+    resumeWorkout() {
+        // Called on init if activeWorkout is loaded from localStorage
+        this.currentView = 'train';
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById('view-train').classList.add('active');
+
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.classList.toggle('active', item.dataset.view === 'train');
+        });
+        document.getElementById('header-title').textContent = 'Entrenar';
+        document.getElementById('header-action-btn').classList.add('hidden');
+
+        document.getElementById('train-select').classList.add('hidden');
+        document.getElementById('train-active').classList.remove('hidden');
+        document.getElementById('workout-routine-name').textContent = this.activeWorkout.routineName;
+
+        this.updateWorkoutTimer();
+        this.workoutTimerInterval = setInterval(() => this.updateWorkoutTimer(), 1000);
+
+        this.renderWorkoutExercises();
+    }
+
+    saveActiveWorkoutState() {
+        this.save('gymtracker_active_workout', this.activeWorkout);
+        this.save('gymtracker_active_time', this.workoutStartTime);
+    }
+
+    clearActiveWorkoutState() {
+        localStorage.removeItem('gymtracker_active_workout');
+        localStorage.removeItem('gymtracker_active_time');
     }
 
     updateWorkoutTimer() {
@@ -457,6 +501,7 @@ class GymTrackerApp {
     updateSet(exIdx, setIdx, field, value) {
         if (!this.activeWorkout) return;
         this.activeWorkout.exercises[exIdx].sets[setIdx][field] = value;
+        this.saveActiveWorkoutState();
     }
 
     toggleSetComplete(exIdx, setIdx) {
@@ -477,6 +522,7 @@ class GymTrackerApp {
             this.openRestTimer();
             this.startRestCountdown();
         }
+        this.saveActiveWorkoutState();
     }
 
     addSet(exIdx) {
@@ -489,6 +535,21 @@ class GymTrackerApp {
             completed: false
         });
         this.renderWorkoutExercises();
+        this.saveActiveWorkoutState();
+    }
+
+    discardWorkout() {
+        if (!this.activeWorkout) return;
+        this.showConfirm('¿Descartar este entrenamiento? Se perderán los datos.', () => {
+            clearInterval(this.workoutTimerInterval);
+            this.activeWorkout = null;
+            this.workoutStartTime = null;
+            this.clearActiveWorkoutState();
+
+            document.getElementById('train-active').classList.add('hidden');
+            document.getElementById('train-select').classList.remove('hidden');
+            this.showToast('Entrenamiento descartado');
+        });
     }
 
     finishWorkout() {
@@ -543,6 +604,7 @@ class GymTrackerApp {
         clearInterval(this.workoutTimerInterval);
         this.activeWorkout = null;
         this.workoutStartTime = null;
+        this.clearActiveWorkoutState();
 
         document.getElementById('train-active').classList.add('hidden');
         document.getElementById('train-select').classList.remove('hidden');

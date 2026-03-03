@@ -109,11 +109,15 @@
             </div>
             <div id="train-active" class="train-active hidden">
                 <div class="workout-header-bar">
-                    <div>
+                    <div style="flex: 1;">
                         <div class="workout-routine-name" id="workout-routine-name"></div>
                         <div class="workout-timer" id="workout-elapsed">00:00</div>
                     </div>
-                    <button class="btn btn-danger btn-sm" onclick="app.finishWorkout()">Terminar</button>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-ghost btn-sm" onclick="app.discardWorkout()" style="padding: 0 10px;"
+                            title="Descartar">🗑️</button>
+                        <button class="btn btn-danger btn-sm" onclick="app.finishWorkout()">Terminar</button>
+                    </div>
                 </div>
                 <div id="workout-exercises" class="workout-exercises">
                     <!-- Populated by JS -->
